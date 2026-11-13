@@ -177,6 +177,11 @@ app.patch("/all-studios/:id", async (req, res) => {
   );
   res.json(result);
 });
+app.delete("/all-studios/:id", async (req, res) => {
+  const { id } = req.params;
+  const result = await studioCollection.deleteOne({ _id: new ObjectId(id) });
+  res.json(result);
+});
 
 app.get("/", (req, res) => {
   res.send("Loftlight API is running.");
