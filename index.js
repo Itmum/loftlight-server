@@ -27,6 +27,7 @@ export async function connectToMongoDB() {
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("loftlight");
 const studioCollection = db.collection("studio");
+const BookingCollection = db.collection("bookings");
 
 // One owner can't list the same title in the same category twice.
 // (Same title in a different category is allowed.)
@@ -168,6 +169,11 @@ app.get("/all-studios/:id", async (req, res) => {
   const result = await studioCollection.findOne({ _id: new ObjectId(id) });
   res.send(result);
 });
+app.get("/all-studios/owner/:email", async (req, res) => {
+  const { email } = req.params;
+  const result = await studioCollection.find({ ownerEmail: email }).toArray();
+  res.send(result);
+});
 app.patch("/all-studios/:id", async (req, res) => {
   const { id } = req.params;
   const updatedData = req.body;
@@ -181,6 +187,40 @@ app.delete("/all-studios/:id", async (req, res) => {
   const { id } = req.params;
   const result = await studioCollection.deleteOne({ _id: new ObjectId(id) });
   res.json(result);
+});
+
+// Booking
+// Replace your old  app.post("/booking", ...)  with this one.
+
+app.post("/booking", async (req, res) => {
+  const data = req.body;
+
+  if (!data.studioId || !data.eventDate) {
+    return res.status(400).json({ message: "Studio and date are required." });
+  }
+
+  // Is this studio already booked on that date? (Cancelled bookings don't count)
+  const alreadyBooked = await BookingCollection.findOne({
+    studioId: data.studioId,
+    eventDate: data.eventDate,
+    status: { $in: ["Pending", "Confirmed"] },
+  });
+
+  if (alreadyBooked) {
+    return res.status(409).json({
+      message: `This studio is already booked on ${data.eventDate}. Please choose another date.`,
+    });
+  }
+
+  data.status = "Pending"; // every new booking starts as Pending
+  const result = await BookingCollection.insertOne(data);
+  res.status(201).send(result);
+});
+
+app.get("/my-bookings/:email", async (req, res) => {
+  const { email } = req.params;
+  const result = await BookingCollection.find({ userEmail: email }).toArray();
+  res.send(result);
 });
 
 app.get("/", (req, res) => {
